@@ -1,0 +1,28 @@
+name: DefaultBrowserPicker
+options:
+  bundleIdPrefix: com.aksakal
+  deploymentTarget:
+    macOS: "14.0"
+  xcodeVersion: "16.0"
+  createIntermediateGroups: true
+
+targets:
+  DefaultBrowserPicker:
+    type: application
+    platform: macOS
+    sources:
+      - DefaultBrowserPicker
+    settings:
+      base:
+        PRODUCT_BUNDLE_IDENTIFIER: com.aksakal.DefaultBrowserPicker
+        PRODUCT_NAME: Default Browser Picker
+        MACOSX_DEPLOYMENT_TARGET: "14.0"
+        INFOPLIST_FILE: DefaultBrowserPicker/Info.plist
+        CODE_SIGN_ENTITLEMENTS: DefaultBrowserPicker/DefaultBrowserPicker.entitlements
+        SWIFT_VERSION: "5.9"
+        ARCHS: "$(ARCHS_STANDARD)"
+        ENABLE_HARDENED_RUNTIME: YES
+        COMBINE_HIDPI_IMAGES: YES
+        LD_RUNPATH_SEARCH_PATHS: "@executable_path/../Frameworks"
+        ASSETCATALOG_COMPILER_APPICON_NAME: AppIcon
+        ENABLE_DEBUG_DYLIB: NO
