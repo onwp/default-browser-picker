@@ -1,0 +1,54 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1024 1024">
+  <defs>
+    <linearGradient id="bg" x1="0" y1="0" x2="1" y2="1">
+      <stop offset="0%" stop-color="#2D2028"/>
+      <stop offset="100%" stop-color="#1A1218"/>
+    </linearGradient>
+    <linearGradient id="ring1" x1="0" y1="0" x2="1" y2="1">
+      <stop offset="0%" stop-color="#E8805A"/>
+      <stop offset="100%" stop-color="#D4654A"/>
+    </linearGradient>
+    <linearGradient id="ring2" x1="0" y1="0" x2="1" y2="1">
+      <stop offset="0%" stop-color="#F0A080"/>
+      <stop offset="100%" stop-color="#E8805A"/>
+    </linearGradient>
+    <linearGradient id="pointer" x1="0" y1="0" x2="0.5" y2="1">
+      <stop offset="0%" stop-color="#F5C4A8"/>
+      <stop offset="100%" stop-color="#E89070"/>
+    </linearGradient>
+    <filter id="glow">
+      <feGaussianBlur stdDeviation="8" result="blur"/>
+      <feComposite in="SourceGraphic" in2="blur" operator="over"/>
+    </filter>
+    <filter id="innerShadow">
+      <feGaussianBlur stdDeviation="12" result="blur"/>
+      <feOffset dx="0" dy="4" result="offsetBlur"/>
+      <feComposite in="SourceGraphic" in2="offsetBlur" operator="over"/>
+    </filter>
+  </defs>
+
+  <!-- Background rounded square -->
+  <rect x="0" y="0" width="1024" height="1024" rx="228" ry="228" fill="url(#bg)"/>
+
+  <!-- Subtle inner border glow -->
+  <rect x="8" y="8" width="1008" height="1008" rx="222" ry="222" fill="none" stroke="#E8805A" stroke-opacity="0.08" stroke-width="2"/>
+
+  <!-- Outer ring -->
+  <circle cx="512" cy="512" r="320" fill="none" stroke="url(#ring1)" stroke-width="52" stroke-opacity="0.9"/>
+
+  <!-- Middle ring -->
+  <circle cx="512" cy="512" r="220" fill="none" stroke="url(#ring2)" stroke-width="44" stroke-opacity="0.85"/>
+
+  <!-- Inner ring -->
+  <circle cx="512" cy="512" r="130" fill="none" stroke="url(#ring1)" stroke-width="36" stroke-opacity="0.9"/>
+
+  <!-- Center dot -->
+  <circle cx="512" cy="512" r="42" fill="url(#pointer)"/>
+
+
+  <!-- Subtle top-left highlight -->
+  <rect x="0" y="0" width="1024" height="1024" rx="228" ry="228"
+        fill="url(#bg)" opacity="0">
+  </rect>
+  <ellipse cx="350" cy="300" rx="300" ry="250" fill="white" opacity="0.02"/>
+</svg>
