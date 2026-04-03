@@ -86,6 +86,36 @@ final class BrowserManager {
         return Bundle(url: appURL)?.bundleIdentifier
     }
 
+    /// Reads the default HTTPS browser directly from the LaunchServices plist on disk,
+    /// bypassing the cfprefsd cache which can be stale.
+    func currentDefaultBrowserFromDisk() -> String? {
+        let path = (NSHomeDirectory() as NSString)
+            .appendingPathComponent("Library/Preferences/com.apple.LaunchServices/com.apple.launchservices.secure.plist")
+        guard let dict = NSDictionary(contentsOfFile: path),
+              let handlers = dict["LSHandlers"] as? [[String: Any]] else {
+            return nil
+        }
+        for handler in handlers {
+            if let scheme = handler["LSHandlerURLScheme"] as? String,
+               scheme.lowercased() == "https",
+               let bundleID = handler["LSHandlerRoleAll"] as? String {
+                return bundleID
+            }
+        }
+        return nil
+    }
+
+    /// Returns the icon for a specific browser by bundle ID.
+    func iconForBrowser(bundleIdentifier: String) -> NSImage {
+        if let appURL = NSWorkspace.shared.urlForApplication(withBundleIdentifier: bundleIdentifier) {
+            let icon = NSWorkspace.shared.icon(forFile: appURL.path)
+            icon.size = NSSize(width: 18, height: 18)
+            return icon
+        }
+        return NSImage(systemSymbolName: "globe", accessibilityDescription: "Default Browser")
+            ?? NSImage()
+    }
+
     /// Sets the default browser for HTTP and HTTPS URL schemes.
     func setDefaultBrowser(bundleIdentifier: String) {
         // Use the modern approach: open a URL with the specified app, which triggers

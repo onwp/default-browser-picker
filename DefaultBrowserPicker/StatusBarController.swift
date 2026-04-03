@@ -5,6 +5,8 @@ final class StatusBarController: NSObject, NSMenuDelegate {
     private let menu: NSMenu
     private let browserManager = BrowserManager()
     private let loginItemManager = LoginItemManager()
+    private var lastKnownDefault: String?
+    private var eventStream: FSEventStreamRef?
 
     override init() {
         statusItem = NSStatusBar.system.statusItem(withLength: NSStatusItem.squareLength)
@@ -14,13 +16,86 @@ final class StatusBarController: NSObject, NSMenuDelegate {
         menu.delegate = self
         statusItem.menu = menu
 
+        lastKnownDefault = browserManager.currentDefaultBrowser()
         updateMenuBarIcon()
+
+        startFSEventStream()
+
+        NSWorkspace.shared.notificationCenter.addObserver(
+            self,
+            selector: #selector(appDidActivate(_:)),
+            name: NSWorkspace.didActivateApplicationNotification,
+            object: nil
+        )
+    }
+
+    deinit {
+        if let stream = eventStream {
+            FSEventStreamStop(stream)
+            FSEventStreamInvalidate(stream)
+            FSEventStreamRelease(stream)
+        }
+        NSWorkspace.shared.notificationCenter.removeObserver(self)
+    }
+
+    @objc private func appDidActivate(_ notification: Notification) {
+        checkForDefaultBrowserChange(readFromDisk: false)
+    }
+
+    // MARK: - FSEventStream
+
+    private func startFSEventStream() {
+        let dirPath = (NSHomeDirectory() as NSString)
+            .appendingPathComponent("Library/Preferences/com.apple.LaunchServices")
+
+        var context = FSEventStreamContext(
+            version: 0,
+            info: Unmanaged.passUnretained(self).toOpaque(),
+            retain: nil,
+            release: nil,
+            copyDescription: nil
+        )
+
+        let callback: FSEventStreamCallback = { _, clientCallBackInfo, _, _, _, _ in
+            guard let info = clientCallBackInfo else { return }
+            let controller = Unmanaged<StatusBarController>.fromOpaque(info).takeUnretainedValue()
+            DispatchQueue.main.async {
+                controller.checkForDefaultBrowserChange(readFromDisk: true)
+            }
+        }
+
+        guard let stream = FSEventStreamCreate(
+            nil,
+            callback,
+            &context,
+            [dirPath as CFString] as CFArray,
+            UInt64(kFSEventStreamEventIdSinceNow),
+            0.3,
+            UInt32(kFSEventStreamCreateFlagUseCFTypes | kFSEventStreamCreateFlagFileEvents)
+        ) else { return }
+
+        FSEventStreamSetDispatchQueue(stream, DispatchQueue.main)
+        FSEventStreamStart(stream)
+        eventStream = stream
+    }
+
+    // MARK: - Change Detection
+
+    private func checkForDefaultBrowserChange(readFromDisk: Bool) {
+        let current = readFromDisk
+            ? browserManager.currentDefaultBrowserFromDisk()
+            : browserManager.currentDefaultBrowser()
+        if let current, current.lowercased() != lastKnownDefault?.lowercased() {
+            lastKnownDefault = current
+            updateMenuBarIcon(bundleIdentifier: current)
+        }
     }
 
     // MARK: - NSMenuDelegate
 
     func menuNeedsUpdate(_ menu: NSMenu) {
         rebuildMenu()
+        lastKnownDefault = browserManager.currentDefaultBrowser()
         updateMenuBarIcon()
     }
 
@@ -36,7 +111,6 @@ final class StatusBarController: NSObject, NSMenuDelegate {
         var addedSeparatorForUnknown = false
 
         for browser in browsers {
-            // Add separator before unknown browsers section
             if hasUnknown && !browser.isKnown && !addedSeparatorForUnknown {
                 menu.addItem(.separator())
                 addedSeparatorForUnknown = true
@@ -58,7 +132,6 @@ final class StatusBarController: NSObject, NSMenuDelegate {
             menu.addItem(item)
         }
 
-        // Subtitle explaining what "default browser" means
         menu.addItem(.separator())
         let subtitleItem = NSMenuItem(
             title: "Your default browser opens links from other apps",
@@ -77,7 +150,6 @@ final class StatusBarController: NSObject, NSMenuDelegate {
         }
         menu.addItem(subtitleItem)
 
-        // Start on Login toggle
         menu.addItem(.separator())
         let loginItem = NSMenuItem(
             title: "Start on Login",
@@ -88,7 +160,6 @@ final class StatusBarController: NSObject, NSMenuDelegate {
         loginItem.state = loginItemManager.isEnabled ? .on : .off
         menu.addItem(loginItem)
 
-        // Quit
         let quitItem = NSMenuItem(
             title: "Quit",
             action: #selector(quitApp(_:)),
@@ -103,10 +174,20 @@ final class StatusBarController: NSObject, NSMenuDelegate {
     @objc private func browserSelected(_ sender: NSMenuItem) {
         guard let bundleID = sender.representedObject as? String else { return }
         browserManager.setDefaultBrowser(bundleIdentifier: bundleID)
+        waitForBrowserChange(attempts: 20)
+    }
 
-        // Update menubar icon after switch
+    private func waitForBrowserChange(attempts: Int, current: Int = 0) {
+        guard current < attempts else { return }
         DispatchQueue.main.asyncAfter(deadline: .now() + 0.5) { [weak self] in
-            self?.updateMenuBarIcon()
+            guard let self else { return }
+            let actual = self.browserManager.currentDefaultBrowser()
+            if let actual, actual.lowercased() != self.lastKnownDefault?.lowercased() {
+                self.lastKnownDefault = actual
+                self.updateMenuBarIcon()
+            } else {
+                self.waitForBrowserChange(attempts: attempts, current: current + 1)
+            }
         }
     }
 
@@ -120,9 +201,15 @@ final class StatusBarController: NSObject, NSMenuDelegate {
 
     // MARK: - Menubar Icon
 
+    private func updateMenuBarIcon(bundleIdentifier: String) {
+        guard let button = statusItem.button else { return }
+        button.image = browserManager.iconForBrowser(bundleIdentifier: bundleIdentifier)
+        button.image?.isTemplate = false
+    }
+
     private func updateMenuBarIcon() {
         guard let button = statusItem.button else { return }
         button.image = browserManager.currentDefaultBrowserIcon()
-        button.image?.isTemplate = false  // Show actual browser icon colors
+        button.image?.isTemplate = false
     }
 }
